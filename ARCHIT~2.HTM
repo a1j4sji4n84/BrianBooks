@@ -1,0 +1,1377 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>從零學 N-Tier、Clean Architecture、DDD（給新手版）</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css">
+<style>
+  :root {
+    --bg: #fafaf9;
+    --surface: #ffffff;
+    --text: #1c1917;
+    --text-soft: #44403c;
+    --text-mute: #78716c;
+    --border: #e7e5e4;
+    --primary: #6366f1;
+    --primary-light: #eef2ff;
+    --green: #10b981;
+    --green-light: #d1fae5;
+    --orange: #f59e0b;
+    --orange-light: #fef3c7;
+    --red: #ef4444;
+    --red-light: #fee2e2;
+    --blue: #3b82f6;
+    --blue-light: #dbeafe;
+    --purple: #a855f7;
+    --purple-light: #f3e8ff;
+    --shadow: 0 4px 6px -1px rgba(0,0,0,0.1), 0 2px 4px -1px rgba(0,0,0,0.06);
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang TC", "Noto Sans TC", "Microsoft JhengHei", sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.8;
+    font-size: 16px;
+  }
+
+  code, pre { font-family: "Fira Code", "JetBrains Mono", Consolas, Monaco, monospace; }
+
+  /* Layout */
+  .wrap {
+    display: grid;
+    grid-template-columns: 240px 1fr;
+    max-width: 1280px;
+    margin: 0 auto;
+    gap: 2rem;
+  }
+  aside.toc {
+    position: sticky;
+    top: 0;
+    height: 100vh;
+    overflow-y: auto;
+    padding: 2rem 1rem 2rem 1.5rem;
+    border-right: 1px solid var(--border);
+    background: var(--surface);
+  }
+  .toc-title {
+    font-size: 0.75rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--text-mute);
+    margin-bottom: 1rem;
+  }
+  .toc a {
+    display: block;
+    padding: 0.4rem 0.5rem;
+    color: var(--text-soft);
+    text-decoration: none;
+    font-size: 0.875rem;
+    border-radius: 6px;
+    margin-bottom: 0.15rem;
+    border-left: 3px solid transparent;
+  }
+  .toc a:hover { background: var(--primary-light); color: var(--primary); }
+  .toc a.active {
+    background: var(--primary-light);
+    color: var(--primary);
+    font-weight: 600;
+    border-left-color: var(--primary);
+  }
+  .toc a.sub { padding-left: 1.5rem; font-size: 0.8rem; color: var(--text-mute); }
+
+  main {
+    padding: 3rem 2rem 6rem;
+    max-width: 880px;
+  }
+
+  /* Hero */
+  .hero {
+    background: linear-gradient(135deg, #1e1b4b 0%, #312e81 50%, #6366f1 100%);
+    color: white;
+    padding: 3rem 2rem;
+    border-radius: 16px;
+    margin-bottom: 3rem;
+    box-shadow: var(--shadow);
+  }
+  .hero h1 {
+    font-size: 2.25rem;
+    font-weight: 800;
+    margin-bottom: 0.75rem;
+    letter-spacing: -0.02em;
+  }
+  .hero p { font-size: 1.05rem; color: #c7d2fe; }
+
+  /* Section */
+  section {
+    margin-bottom: 4rem;
+    padding-top: 1rem;
+  }
+  h2 {
+    font-size: 1.75rem;
+    font-weight: 700;
+    margin-bottom: 1rem;
+    padding-bottom: 0.75rem;
+    border-bottom: 2px solid var(--border);
+    letter-spacing: -0.01em;
+  }
+  h3 {
+    font-size: 1.25rem;
+    font-weight: 700;
+    margin: 2rem 0 0.75rem;
+  }
+  h4 {
+    font-size: 1.05rem;
+    font-weight: 600;
+    margin: 1.5rem 0 0.5rem;
+  }
+  p { margin-bottom: 1rem; color: var(--text-soft); }
+  strong { color: var(--text); font-weight: 700; }
+
+  /* Inline code */
+  :not(pre) > code {
+    background: #f1f5f9;
+    color: #4f46e5;
+    padding: 0.15em 0.4em;
+    border-radius: 4px;
+    font-size: 0.875em;
+    font-weight: 500;
+  }
+
+  /* Layer badge */
+  .layer-badge {
+    display: inline-block;
+    padding: 0.2rem 0.6rem;
+    border-radius: 4px;
+    font-size: 0.75rem;
+    font-weight: 700;
+    margin-right: 0.5rem;
+    vertical-align: middle;
+  }
+  .lb-web { background: var(--blue-light); color: #1e40af; }
+  .lb-app { background: var(--orange-light); color: #92400e; }
+  .lb-dom { background: var(--purple-light); color: #6b21a8; }
+  .lb-inf { background: var(--green-light); color: #065f46; }
+
+  /* Term */
+  .term {
+    background: linear-gradient(135deg, #fffbeb 0%, #fef3c7 100%);
+    border: 1px solid #fcd34d;
+    border-left: 4px solid #f59e0b;
+    padding: 1rem 1.25rem;
+    border-radius: 8px;
+    margin: 1rem 0;
+  }
+  .term-name {
+    font-size: 0.7rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: #92400e;
+    margin-bottom: 0.25rem;
+  }
+  .term-en {
+    font-weight: 700;
+    color: #1c1917;
+    margin-right: 0.5rem;
+  }
+  .term-meta {
+    font-size: 0.875rem;
+    color: var(--text-mute);
+    font-style: italic;
+  }
+  .term p { margin-bottom: 0; color: var(--text-soft); }
+
+  /* Callout */
+  .callout {
+    padding: 1rem 1.25rem;
+    border-radius: 8px;
+    margin: 1.25rem 0;
+    border-left: 4px solid;
+  }
+  .callout p:last-child { margin-bottom: 0; }
+  .callout.bad { background: var(--red-light); border-color: var(--red); }
+  .callout.good { background: var(--green-light); border-color: var(--green); }
+  .callout.info { background: var(--blue-light); border-color: var(--blue); }
+  .callout.warn { background: var(--orange-light); border-color: var(--orange); }
+  .callout-title { font-weight: 700; margin-bottom: 0.25rem; display: block; }
+
+  /* Story box */
+  .story {
+    background: linear-gradient(135deg, #faf5ff 0%, #fdf4ff 100%);
+    border: 2px solid #e9d5ff;
+    border-radius: 12px;
+    padding: 1.5rem 1.75rem;
+    margin: 1.5rem 0;
+  }
+  .story-tag {
+    display: inline-block;
+    background: #a855f7;
+    color: white;
+    padding: 0.2rem 0.6rem;
+    border-radius: 4px;
+    font-size: 0.7rem;
+    font-weight: 700;
+    margin-bottom: 0.75rem;
+    letter-spacing: 0.05em;
+  }
+  .story h4 { margin-top: 0; }
+
+  /* Rules list */
+  .rules {
+    background: white;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 1.25rem 1.5rem;
+    margin: 1rem 0;
+  }
+  .rules ol { margin-left: 1.5rem; }
+  .rules li { margin-bottom: 0.4rem; color: var(--text-soft); }
+
+  /* Code block */
+  pre[class*="language-"] {
+    border-radius: 8px;
+    margin: 1rem 0;
+    font-size: 0.85rem;
+    line-height: 1.6;
+    box-shadow: var(--shadow);
+  }
+  .code-with-label { position: relative; margin: 1.5rem 0; }
+  .code-label {
+    background: #1e1b4b;
+    color: white;
+    padding: 0.5rem 1rem;
+    border-radius: 8px 8px 0 0;
+    font-size: 0.8rem;
+    font-weight: 600;
+    font-family: "Fira Code", monospace;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+  .code-label.web { background: #1e40af; }
+  .code-label.app { background: #b45309; }
+  .code-label.dom { background: #7c3aed; }
+  .code-label.inf { background: #047857; }
+  .code-with-label pre { margin-top: 0 !important; border-radius: 0 0 8px 8px !important; }
+
+  /* Comparison table */
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 1.25rem 0;
+    background: white;
+    border-radius: 8px;
+    overflow: hidden;
+    box-shadow: var(--shadow);
+    font-size: 0.92rem;
+  }
+  th, td {
+    padding: 0.85rem 1rem;
+    text-align: left;
+    border-bottom: 1px solid var(--border);
+    vertical-align: top;
+  }
+  th {
+    background: #f8fafc;
+    font-weight: 700;
+    font-size: 0.8rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+  tr:last-child td { border-bottom: none; }
+
+  /* Side-by-side comparison */
+  .side-by-side {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem;
+    margin: 1.5rem 0;
+  }
+  .side-by-side > div {
+    background: white;
+    border-radius: 8px;
+    padding: 1.25rem;
+    border: 1px solid var(--border);
+  }
+  .side-by-side h4 { margin-top: 0; }
+  .side-bad { border-color: #fca5a5 !important; background: linear-gradient(180deg, #fef2f2 0%, white 100%) !important; }
+  .side-good { border-color: #86efac !important; background: linear-gradient(180deg, #f0fdf4 0%, white 100%) !important; }
+
+  /* Diagram */
+  .diagram {
+    background: white;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 2rem 1.5rem;
+    margin: 1.5rem 0;
+    text-align: center;
+    overflow-x: auto;
+  }
+
+  /* Restaurant analogy */
+  .analogy {
+    background: #fff7ed;
+    border: 2px dashed #fb923c;
+    border-radius: 12px;
+    padding: 1.5rem;
+    margin: 1.5rem 0;
+  }
+  .analogy-title {
+    color: #c2410c;
+    font-weight: 700;
+    margin-bottom: 0.5rem;
+    font-size: 1.05rem;
+  }
+
+  /* Diff highlight in code */
+  .highlight-add { background: rgba(16,185,129,0.2); display: inline-block; width: 100%; }
+  .highlight-bad { background: rgba(239,68,68,0.2); display: inline-block; width: 100%; }
+
+  /* Mobile */
+  @media (max-width: 900px) {
+    .wrap { grid-template-columns: 1fr; }
+    aside.toc { position: static; height: auto; border-right: none; border-bottom: 1px solid var(--border); }
+    main { padding: 2rem 1.25rem; }
+    .side-by-side { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+
+<div class="wrap">
+  <aside class="toc">
+    <div class="toc-title">目錄</div>
+    <a href="#ch0" class="active">前言：先看看你會學到什麼</a>
+    <a href="#ch1">第 1 章：基本詞彙先講清楚</a>
+    <a href="#ch1-1" class="sub">1.1 什麼叫「層」？</a>
+    <a href="#ch1-2" class="sub">1.2 什麼叫「依賴」？</a>
+    <a href="#ch1-3" class="sub">1.3 什麼叫「介面」？</a>
+    <a href="#ch1-4" class="sub">1.4 什麼叫「Mock」？</a>
+    <a href="#ch2">第 2 章：場景設定 — 銀行轉帳</a>
+    <a href="#ch3">第 3 章：N-Tier 寫法</a>
+    <a href="#ch3-1" class="sub">3.1 完整程式碼</a>
+    <a href="#ch3-2" class="sub">3.2 災難現場：別人寫的 bug</a>
+    <a href="#ch3-3" class="sub">3.3 為什麼這個測試很痛苦</a>
+    <a href="#ch4">第 4 章：Clean Architecture 寫法</a>
+    <a href="#ch4-1" class="sub">4.1 核心觀念：依賴反轉</a>
+    <a href="#ch4-2" class="sub">4.2 程式碼變化</a>
+    <a href="#ch4-3" class="sub">4.3 還沒解決的問題</a>
+    <a href="#ch5">第 5 章：DDD 寫法</a>
+    <a href="#ch5-1" class="sub">5.1 把規則搬進 Account</a>
+    <a href="#ch5-2" class="sub">5.2 同一個 bug 寫不出來</a>
+    <a href="#ch5-3" class="sub">5.3 測試變超簡單</a>
+    <a href="#ch6">第 6 章：你最大的疑問</a>
+    <a href="#ch6-1" class="sub">6.1 換 DB 真的有差嗎？</a>
+    <a href="#ch6-2" class="sub">6.2 還是會互相呼叫，差在哪？</a>
+    <a href="#ch7">第 7 章：總結 — 一張圖看懂</a>
+  </aside>
+
+  <main>
+    <div class="hero">
+      <h1>從零學三大架構</h1>
+      <p>這份是給「看了一堆教學還是搞不清楚」的人寫的。我們會從一個真實場景開始，看同一個功能在三種架構下怎麼寫、bug 怎麼發生、測試怎麼寫。</p>
+    </div>
+
+    <!-- ===== Ch 0 ===== -->
+    <section id="ch0">
+      <h2>前言：你會學到什麼</h2>
+      <p>很多教學會直接丟一堆名詞 — Aggregate、Bounded Context、Use Case。我懂為什麼你會卡。這次我們反過來：</p>
+      <ol style="margin-left: 1.5rem; color: var(--text-soft);">
+        <li>先用 <strong>5 分鐘</strong>把基本詞彙講清楚（層、依賴、介面、Mock）。</li>
+        <li>設定一個你完全能想像的場景：<strong>銀行轉帳</strong>。</li>
+        <li>用同一個場景寫三遍：<strong>N-Tier → Clean Architecture → DDD</strong>。</li>
+        <li>每一遍都演示同一個 bug 怎麼發生（或不發生）、同一個測試怎麼寫。</li>
+        <li>最後回答你的疑問：「層之間還是會互相呼叫，那差別到底在哪？」</li>
+      </ol>
+      <p>看完這份，你不會變成架構大師，但你會<strong>看出三種架構的關鍵差異</strong> — 而且能講給別人聽。</p>
+    </section>
+
+    <!-- ===== Ch 1 ===== -->
+    <section id="ch1">
+      <h2>第 1 章：基本詞彙先講清楚</h2>
+      <p>後面要用到的字都先解釋一次。這章很短，但跳過你會卡。</p>
+
+      <div id="ch1-1"></div>
+      <h3>1.1 什麼叫「層」（Layer / Tier）？</h3>
+      <p>「層」就是把程式碼按職責分組。每個檔案放在一個資料夾裡，這個資料夾代表一個層。</p>
+
+      <div class="analogy">
+        <div class="analogy-title">用餐廳比喻</div>
+        <p style="margin-bottom: 0;">餐廳有四種人：<strong>服務生、廚師、採購、農夫</strong>。客人不會直接跟農夫點菜，農夫也不會跑到桌邊上菜。每個角色職責清楚 — 這就是「分層」。</p>
+      </div>
+
+      <table>
+        <thead><tr><th>餐廳角色</th><th>對應軟體層</th><th>職責</th></tr></thead>
+        <tbody>
+          <tr><td>服務生</td><td>Web / UI 層</td><td>跟客人互動、收訂單</td></tr>
+          <tr><td>廚師</td><td>Business / Application 層</td><td>實際做菜（業務邏輯）</td></tr>
+          <tr><td>採購</td><td>Repository 層</td><td>把食材送到廚房</td></tr>
+          <tr><td>農夫</td><td>Database</td><td>真正生產食材</td></tr>
+        </tbody>
+      </table>
+
+      <div id="ch1-2"></div>
+      <h3>1.2 什麼叫「依賴」（Dependency）？</h3>
+      <p>A 依賴 B：A 的程式碼裡<strong>用到</strong> B、<strong>需要</strong> B 才能跑。</p>
+
+      <div class="code-with-label">
+        <div class="code-label">範例：A 依賴 B</div>
+        <pre><code class="language-csharp">public class A
+{
+    private B _b = new B();   // ← A 的程式碼裡寫了 B，所以 A 依賴 B
+
+    public void DoSomething()
+    {
+        _b.HelpMe();           // ← 沒有 B，A 跑不起來
+    }
+}</code></pre>
+      </div>
+
+      <p><strong>「依賴方向」</strong>是指：誰知道誰存在。上面這段：A 知道 B 存在，但 B 完全不知道 A 存在。所以箭頭是「A → B」。</p>
+
+      <div class="callout info">
+        <span class="callout-title">為什麼依賴方向重要？</span>
+        <p>如果 A 依賴 B，那<strong>改 B 可能會影響 A</strong>，但改 A 不會影響 B。所以「<em>讓核心業務不依賴技術細節</em>」=「就算 DB 換了、Web 框架換了，核心業務也不用動」。這就是 Clean Architecture 的整個核心觀念。</p>
+      </div>
+
+      <div id="ch1-3"></div>
+      <h3>1.3 什麼叫「介面」（Interface）？</h3>
+      <p>介面是<strong>「契約」</strong>。它說「我有這些方法」，但不說「怎麼實作」。</p>
+
+      <div class="code-with-label">
+        <div class="code-label">介面 vs 實作</div>
+        <pre><code class="language-csharp">// 介面：只規定「有什麼方法」
+public interface IAccountRepository
+{
+    Account Get(int id);
+    void Save(Account account);
+}
+
+// 實作 1：用 SQL Server
+public class SqlAccountRepository : IAccountRepository
+{
+    public Account Get(int id) { /* 用 SQL 查 */ }
+    public void Save(Account account) { /* 用 SQL 寫 */ }
+}
+
+// 實作 2：用 MongoDB
+public class MongoAccountRepository : IAccountRepository
+{
+    public Account Get(int id) { /* 用 Mongo 查 */ }
+    public void Save(Account account) { /* 用 Mongo 寫 */ }
+}</code></pre>
+      </div>
+
+      <p>使用方只寫 <code>IAccountRepository</code>，不寫具體的 <code>SqlAccountRepository</code>。要換實作只要換注入的那行，使用方完全不動。</p>
+
+      <div class="analogy">
+        <div class="analogy-title">用插座比喻</div>
+        <p style="margin-bottom: 0;">「USB 介面」規定形狀和針腳。手機、耳機、隨身碟都實作這個介面。電腦只認 USB 介面，不在乎你插的是哪個牌子的手機 — 這就是「依賴介面，不依賴實作」。</p>
+      </div>
+
+      <div id="ch1-4"></div>
+      <h3>1.4 什麼叫「Mock」（假物件）？</h3>
+      <p>寫測試時，不想真的連 DB（慢、要準備資料、可能爆掉），所以做一個「假的 Repository」假裝是真的。這個假的就叫 Mock。</p>
+
+      <div class="code-with-label">
+        <div class="code-label">Mock 範例</div>
+        <pre><code class="language-csharp">// 測試「轉帳餘額不足會失敗」這條規則
+
+// 真實情況：要連 DB、塞兩筆帳戶資料、跑完還要清資料
+// Mock 做法：
+var fakeRepo = new Mock&lt;IAccountRepository&gt;();
+fakeRepo.Setup(r =&gt; r.Get(1)).Returns(new Account { Balance = 50 });
+fakeRepo.Setup(r =&gt; r.Get(2)).Returns(new Account { Balance = 0 });
+
+var service = new TransferService(fakeRepo.Object);
+// 試圖從帳戶 1（餘額 50）轉 100 到帳戶 2 → 應該失敗
+Assert.Throws&lt;Exception&gt;(() =&gt; service.Transfer(1, 2, 100));</code></pre>
+      </div>
+
+      <p>「Mock 的麻煩程度」是評估架構好壞的重要指標。<strong>越難 Mock，代表程式碼跟外部依賴綁太緊</strong>。後面你會看到 DDD 完全不需要 Mock。</p>
+    </section>
+
+    <!-- ===== Ch 2 ===== -->
+    <section id="ch2">
+      <h2>第 2 章：場景設定 — 銀行轉帳</h2>
+
+      <div class="story">
+        <div class="story-tag">場景</div>
+        <h4>需求</h4>
+        <p>要做一個 API：<code>POST /transfer</code>，把錢從 A 帳戶轉到 B 帳戶。聽起來很簡單，<strong>但業務規則很多</strong>。</p>
+      </div>
+
+      <div class="rules">
+        <strong>業務規則（記住這 5 條，後面整篇都在解這個問題）</strong>
+        <ol>
+          <li>轉出帳戶<strong>餘額必須足夠</strong>（不能讓帳戶變負數）</li>
+          <li>轉出帳戶<strong>不能是凍結狀態</strong></li>
+          <li>不能<strong>轉給自己</strong></li>
+          <li>轉帳金額<strong>必須大於 0</strong></li>
+          <li>單日累計轉出<strong>不能超過 100 萬</strong></li>
+        </ol>
+      </div>
+
+      <p>為什麼挑這個場景？因為它很簡單你能想像，<strong>但業務規則違反就會出大事</strong>（帳戶變負數＝銀行虧錢）。這種「規則必須被嚴格遵守」的場景，正是要區分三種架構的最佳測試。</p>
+
+      <div class="callout info">
+        <span class="callout-title">關鍵問題</span>
+        <p>規則 1（餘額必須足夠）寫在哪裡？<br>
+        — 你回答的位置，就決定了你用的是哪一種架構。</p>
+      </div>
+    </section>
+
+    <!-- ===== Ch 3 ===== -->
+    <section id="ch3">
+      <h2>第 3 章：N-Tier 寫法</h2>
+      <p>最常見的寫法。三層：<strong>Controller → Service → Repository</strong>。規則寫在 Service 裡。</p>
+
+      <div id="ch3-1"></div>
+      <h3>3.1 完整程式碼（每個 class 都標清楚在哪一層）</h3>
+
+      <h4><span class="layer-badge lb-dom">資料模型</span>Account.cs</h4>
+      <div class="code-with-label">
+        <div class="code-label">📦 純資料容器，沒有任何方法</div>
+        <pre><code class="language-csharp">// ─────────────────────────────────────────────
+// 這個 class 只是「資料的形狀」，沒有業務邏輯
+// 所有屬性都是 public get; set; — 任何人都能改
+// ─────────────────────────────────────────────
+public class Account
+{
+    public int Id { get; set; }
+    public decimal Balance { get; set; }       // ← 任何人都能直接改
+    public bool IsFrozen { get; set; }         // ← 任何人都能直接改
+    public decimal DailyTransferred { get; set; }
+}</code></pre>
+      </div>
+
+      <div class="callout warn">
+        <span class="callout-title">⚠️ 注意這個現象</span>
+        <p>這種「只有屬性、沒有方法」的物件叫做<strong>「貧血模型」（Anemic Model）</strong>。它只是個資料袋。<em>後面會看到這個設計是萬惡之源</em>。</p>
+      </div>
+
+      <h4><span class="layer-badge lb-inf">Repository 層</span>AccountRepository.cs</h4>
+      <div class="code-with-label">
+        <div class="code-label inf">🟢 Repository 層 — 跟 DB 對話</div>
+        <pre><code class="language-csharp">// ─────────────────────────────────────────────
+// 職責：把 SQL 包起來，給上層用
+// 上層（Service）會呼叫這個
+// 這層會呼叫：DB
+// ─────────────────────────────────────────────
+public class AccountRepository
+{
+    private readonly string _connStr;
+
+    public Account Get(int id)
+    {
+        // 連 DB、撈資料、轉成 Account 物件回傳
+        using var conn = new SqlConnection(_connStr);
+        return conn.QueryFirstOrDefault&lt;Account&gt;(
+            "SELECT * FROM Accounts WHERE Id = @Id", new { Id = id });
+    }
+
+    public void Save(Account account)
+    {
+        // 寫回 DB
+        using var conn = new SqlConnection(_connStr);
+        conn.Execute(
+            "UPDATE Accounts SET Balance=@Balance, DailyTransferred=@DailyTransferred WHERE Id=@Id",
+            account);
+    }
+}</code></pre>
+      </div>
+
+      <h4><span class="layer-badge lb-app">Service 層</span>TransferService.cs（重點）</h4>
+      <div class="code-with-label">
+        <div class="code-label app">🟧 Service 層 — 業務規則寫在這</div>
+        <pre><code class="language-csharp">// ─────────────────────────────────────────────
+// 職責：處理「轉帳」這個業務動作
+// 上層（Controller）會呼叫這個
+// 這層會呼叫：AccountRepository
+// ─────────────────────────────────────────────
+public class TransferService
+{
+    private readonly AccountRepository _repo;  // ← 直接依賴具體類別
+
+    public TransferService(AccountRepository repo)
+    {
+        _repo = repo;
+    }
+
+    public void Transfer(int fromId, int toId, decimal amount)
+    {
+        // 步驟 1：往下呼叫 Repository 拿資料
+        var from = _repo.Get(fromId);
+        var to = _repo.Get(toId);
+
+        // 步驟 2：在這裡檢查所有業務規則 ← 重點
+        if (from == null || to == null)
+            throw new Exception("帳戶不存在");
+        if (amount &lt;= 0)
+            throw new Exception("金額必須大於 0");
+        if (fromId == toId)
+            throw new Exception("不能轉給自己");
+        if (from.IsFrozen)
+            throw new Exception("帳戶已凍結");
+        if (from.Balance &lt; amount)
+            throw new Exception("餘額不足");
+        if (from.DailyTransferred + amount &gt; 1_000_000)
+            throw new Exception("超過單日上限");
+
+        // 步驟 3：直接修改 Account 的屬性 ← 注意這裡
+        from.Balance -= amount;
+        from.DailyTransferred += amount;
+        to.Balance += amount;
+
+        // 步驟 4：往下呼叫 Repository 存回去
+        _repo.Save(from);
+        _repo.Save(to);
+    }
+}</code></pre>
+      </div>
+
+      <h4><span class="layer-badge lb-web">Controller 層</span>TransferController.cs</h4>
+      <div class="code-with-label">
+        <div class="code-label web">🟦 Web 層 — 處理 HTTP 請求</div>
+        <pre><code class="language-csharp">// ─────────────────────────────────────────────
+// 職責：接收 HTTP 請求、呼叫 Service、回傳結果
+// 上層：客戶端（前端、Postman）
+// 這層會呼叫：TransferService
+// ─────────────────────────────────────────────
+[ApiController]
+public class TransferController : ControllerBase
+{
+    private readonly TransferService _service;  // ← 依賴 Service
+
+    public TransferController(TransferService service)
+    {
+        _service = service;
+    }
+
+    [HttpPost("transfer")]
+    public IActionResult Transfer([FromBody] TransferDto dto)
+    {
+        try
+        {
+            _service.Transfer(dto.FromId, dto.ToId, dto.Amount);
+            return Ok();
+        }
+        catch (Exception ex)
+        {
+            return BadRequest(ex.Message);
+        }
+    }
+}</code></pre>
+      </div>
+
+      <h4>整體呼叫關係</h4>
+      <div class="diagram">
+        <svg viewBox="0 0 600 220" xmlns="http://www.w3.org/2000/svg" style="max-width: 100%; height: auto;">
+          <rect x="20" y="20" width="120" height="60" rx="8" fill="#dbeafe" stroke="#1e40af" stroke-width="2"/>
+          <text x="80" y="46" text-anchor="middle" font-size="13" font-weight="700" fill="#1e40af">Controller</text>
+          <text x="80" y="64" text-anchor="middle" font-size="11" fill="#1e40af">Web 層</text>
+
+          <rect x="180" y="20" width="120" height="60" rx="8" fill="#fef3c7" stroke="#92400e" stroke-width="2"/>
+          <text x="240" y="46" text-anchor="middle" font-size="13" font-weight="700" fill="#92400e">Service</text>
+          <text x="240" y="64" text-anchor="middle" font-size="11" fill="#92400e">業務規則在這</text>
+
+          <rect x="340" y="20" width="120" height="60" rx="8" fill="#d1fae5" stroke="#065f46" stroke-width="2"/>
+          <text x="400" y="46" text-anchor="middle" font-size="13" font-weight="700" fill="#065f46">Repository</text>
+          <text x="400" y="64" text-anchor="middle" font-size="11" fill="#065f46">DB 操作</text>
+
+          <rect x="500" y="20" width="80" height="60" rx="8" fill="#e7e5e4" stroke="#57534e" stroke-width="2"/>
+          <text x="540" y="50" text-anchor="middle" font-size="13" font-weight="700" fill="#57534e">DB</text>
+
+          <path d="M 140 50 L 175 50" stroke="#374151" stroke-width="2" marker-end="url(#a1)"/>
+          <path d="M 300 50 L 335 50" stroke="#374151" stroke-width="2" marker-end="url(#a1)"/>
+          <path d="M 460 50 L 495 50" stroke="#374151" stroke-width="2" marker-end="url(#a1)"/>
+
+          <text x="300" y="130" text-anchor="middle" font-size="13" fill="#1c1917" font-weight="600">依賴方向：上層 → 下層</text>
+          <text x="300" y="155" text-anchor="middle" font-size="12" fill="#78716c">每一層直接依賴下一層的具體類別</text>
+          <text x="300" y="180" text-anchor="middle" font-size="12" fill="#dc2626" font-weight="600">業務規則寫在 Service，Account 只是資料袋</text>
+
+          <defs>
+            <marker id="a1" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto">
+              <path d="M 0 0 L 10 5 L 0 10 z" fill="#374151"/>
+            </marker>
+          </defs>
+        </svg>
+      </div>
+
+      <div id="ch3-2"></div>
+      <h3>3.2 災難現場：別人寫的 bug</h3>
+      <p>三個月後，另一個工程師「小明」要做新功能：「<strong>給 VIP 客戶加值點數</strong>」。他完全不知道你之前寫的轉帳規則。他寫了：</p>
+
+      <div class="code-with-label">
+        <div class="code-label app">🟧 小明寫的新 Service</div>
+        <pre><code class="language-csharp">public class BonusService
+{
+    private readonly AccountRepository _repo;
+
+    public void AddBonus(int accountId, decimal bonus)
+    {
+        var account = _repo.Get(accountId);
+        account.Balance += bonus;   // ← 直接改 Balance！
+        _repo.Save(account);
+    }
+}</code></pre>
+      </div>
+
+      <p>看起來沒問題。但 <code>bonus</code> 是從前端傳來的 <code>decimal</code>，<strong>使用者可以傳負數</strong>！</p>
+
+      <div class="callout bad">
+        <span class="callout-title">🔴 災難發生</span>
+        <p>使用者送出 <code>{ accountId: 123, bonus: -999999 }</code>。<br>
+        系統乖乖把帳戶餘額減 999999，變負數。銀行虧錢。</p>
+        <p><strong>為什麼會這樣？</strong>因為 <code>Account.Balance</code> 是 <code>public set;</code>，<em>任何地方</em>都能直接改。<code>TransferService</code> 裡寫的「餘額不能小於 0」這條規則，<strong>只在 TransferService 內有效</strong>。其他 Service 完全可以繞過。</p>
+      </div>
+
+      <p><strong>業務規則跟資料分開放</strong>，所以規則只能保護「特定的入口」（轉帳），保護不了資料本身。這是 N-Tier 最大的缺陷。</p>
+
+      <div id="ch3-3"></div>
+      <h3>3.3 為什麼這個測試很痛苦</h3>
+      <p>你想寫單元測試驗證「餘額不足會被擋下」。試試看：</p>
+
+      <div class="code-with-label">
+        <div class="code-label">N-Tier 測試</div>
+        <pre><code class="language-csharp">[Test]
+public void 餘額不足要擋下()
+{
+    // 1. 建假的 Repository
+    var mockRepo = new Mock&lt;AccountRepository&gt;();
+
+    // 2. 設定假的回傳值（這裡卡住：AccountRepository 不是介面，
+    //    Mock 不出來，要先去把它改成介面 IAccountRepository）
+    mockRepo.Setup(r =&gt; r.Get(1))
+            .Returns(new Account { Id = 1, Balance = 50 });
+    mockRepo.Setup(r =&gt; r.Get(2))
+            .Returns(new Account { Id = 2, Balance = 0 });
+
+    // 3. 注入 Service
+    var service = new TransferService(mockRepo.Object);
+
+    // 4. 真正的測試只有這一行
+    Assert.Throws&lt;Exception&gt;(() =&gt; service.Transfer(1, 2, 100));
+}</code></pre>
+      </div>
+
+      <div class="callout warn">
+        <span class="callout-title">⚠️ 痛點清單</span>
+        <p>1. 要先把 <code>AccountRepository</code> 改成介面才能 Mock<br>
+        2. 真正想驗的「<em>餘額不足擋下</em>」這條規則，<strong>被埋在一坨 Mock 設定後面</strong><br>
+        3. 每測一條規則都要重設一次 Mock<br>
+        4. Mock 設錯了測試會偽陽性（明明壞掉但測試過了）</p>
+      </div>
+    </section>
+
+    <!-- ===== Ch 4 ===== -->
+    <section id="ch4">
+      <h2>第 4 章：Clean Architecture 寫法</h2>
+      <p>Clean Architecture 解決「依賴方向」的問題，但<strong>還沒解決「業務規則放哪」的問題</strong>。先看它做了什麼。</p>
+
+      <div id="ch4-1"></div>
+      <h3>4.1 核心觀念：依賴反轉（Dependency Inversion）</h3>
+
+      <div class="term">
+        <div class="term-name">術語</div>
+        <span class="term-en">Dependency Inversion</span>
+        <span class="term-meta">依賴反轉</span>
+        <p>把「直接依賴具體類別」改成「依賴介面」。表面上只是中間多了個介面，實際上把依賴方向「轉了過來」。</p>
+      </div>
+
+      <h4>之前 vs 之後</h4>
+      <div class="side-by-side">
+        <div class="side-bad">
+          <h4>❌ N-Tier（直接依賴）</h4>
+          <p style="font-size: 0.9rem;">Service 直接 <code>new</code> Repository 或建構子吃 <code>AccountRepository</code>。</p>
+          <pre style="margin: 0.5rem 0;"><code class="language-csharp" style="font-size: 0.78rem;">public class TransferService
+{
+    private readonly AccountRepository _repo;
+    //                ↑ 具體類別
+
+    public TransferService(AccountRepository repo)
+    { _repo = repo; }
+}</code></pre>
+          <p style="font-size: 0.85rem; margin-bottom: 0;"><strong>問題</strong>：換 ORM、Mock 測試都要動 Service。</p>
+        </div>
+        <div class="side-good">
+          <h4>✅ Clean Architecture（依賴介面）</h4>
+          <p style="font-size: 0.9rem;">Service 依賴 <code>IAccountRepository</code> 介面，不知道實作是誰。</p>
+          <pre style="margin: 0.5rem 0;"><code class="language-csharp" style="font-size: 0.78rem;">public class TransferService
+{
+    private readonly IAccountRepository _repo;
+    //                ↑ 介面
+
+    public TransferService(IAccountRepository repo)
+    { _repo = repo; }
+}</code></pre>
+          <p style="font-size: 0.85rem; margin-bottom: 0;"><strong>好處</strong>：換 ORM、Mock 測試只動實作端，Service 不動。</p>
+        </div>
+      </div>
+
+      <div id="ch4-2"></div>
+      <h3>4.2 程式碼變化（差異不大）</h3>
+      <p>檔案結構分四個專案：</p>
+      <pre><code class="language-plaintext">Domain/         ← Account.cs（純粹資料模型，無依賴）
+Application/    ← TransferService.cs、IAccountRepository.cs（介面定義在這）
+Infrastructure/ ← AccountRepository.cs（實作 IAccountRepository，用 SQL）
+Web/            ← TransferController.cs</code></pre>
+
+      <h4>關鍵：介面定義在 Application 層</h4>
+      <div class="code-with-label">
+        <div class="code-label app">🟧 Application/IAccountRepository.cs</div>
+        <pre><code class="language-csharp">// 介面定義在這裡，但實作在 Infrastructure
+// ⚠️ 注意：介面跟實作不在同一層！
+public interface IAccountRepository
+{
+    Account Get(int id);
+    void Save(Account account);
+}</code></pre>
+      </div>
+
+      <div class="code-with-label">
+        <div class="code-label inf">🟢 Infrastructure/SqlAccountRepository.cs</div>
+        <pre><code class="language-csharp">// 實作介面（介面在 Application 層）
+public class SqlAccountRepository : IAccountRepository
+{
+    public Account Get(int id) { /* SQL */ }
+    public void Save(Account a) { /* SQL */ }
+}</code></pre>
+      </div>
+
+      <div class="callout info">
+        <span class="callout-title">💡 這就是「依賴反轉」的精髓</span>
+        <p>Application 層需要存取資料，但<strong>介面是它自己定義的</strong>。Infrastructure 層來實作這個介面。<br>
+        所以表面上 <code>SqlAccountRepository</code> 在「下面」，但<strong>箭頭其實是從下往上指</strong>（Infrastructure 依賴 Application）。<br>
+        這就是依賴方向被「反轉」了。</p>
+      </div>
+
+      <h4>呼叫關係圖</h4>
+      <div class="diagram">
+        <svg viewBox="0 0 600 240" xmlns="http://www.w3.org/2000/svg" style="max-width: 100%; height: auto;">
+          <rect x="20" y="20" width="120" height="60" rx="8" fill="#dbeafe" stroke="#1e40af" stroke-width="2"/>
+          <text x="80" y="46" text-anchor="middle" font-size="13" font-weight="700" fill="#1e40af">Controller</text>
+          <text x="80" y="64" text-anchor="middle" font-size="11" fill="#1e40af">Web</text>
+
+          <rect x="180" y="20" width="120" height="60" rx="8" fill="#fef3c7" stroke="#92400e" stroke-width="2"/>
+          <text x="240" y="40" text-anchor="middle" font-size="13" font-weight="700" fill="#92400e">TransferService</text>
+          <text x="240" y="58" text-anchor="middle" font-size="10" fill="#92400e">Application</text>
+          <text x="240" y="72" text-anchor="middle" font-size="10" fill="#92400e">用 IAccountRepository</text>
+
+          <rect x="180" y="130" width="120" height="50" rx="8" fill="#fef3c7" stroke-dasharray="4 4" stroke="#92400e" stroke-width="2"/>
+          <text x="240" y="150" text-anchor="middle" font-size="11" font-weight="700" fill="#92400e">IAccountRepository</text>
+          <text x="240" y="167" text-anchor="middle" font-size="10" fill="#92400e">介面（在 Application 層）</text>
+
+          <rect x="380" y="130" width="180" height="60" rx="8" fill="#d1fae5" stroke="#065f46" stroke-width="2"/>
+          <text x="470" y="155" text-anchor="middle" font-size="13" font-weight="700" fill="#065f46">SqlAccountRepository</text>
+          <text x="470" y="173" text-anchor="middle" font-size="11" fill="#065f46">Infrastructure（實作）</text>
+
+          <path d="M 140 50 L 175 50" stroke="#374151" stroke-width="2" marker-end="url(#a2)"/>
+          <path d="M 240 80 L 240 130" stroke="#374151" stroke-width="2" stroke-dasharray="4 4" marker-end="url(#a2)"/>
+          <path d="M 380 160 L 305 160" stroke="#dc2626" stroke-width="2.5" marker-end="url(#a3)"/>
+
+          <text x="380" y="225" text-anchor="middle" font-size="12" fill="#dc2626" font-weight="600">⬅️ 依賴方向被「反轉」：實作端依賴介面端</text>
+
+          <defs>
+            <marker id="a2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto">
+              <path d="M 0 0 L 10 5 L 0 10 z" fill="#374151"/>
+            </marker>
+            <marker id="a3" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto">
+              <path d="M 0 0 L 10 5 L 0 10 z" fill="#dc2626"/>
+            </marker>
+          </defs>
+        </svg>
+      </div>
+
+      <h4>測試變多簡單？</h4>
+      <div class="code-with-label">
+        <div class="code-label">Clean Architecture 測試</div>
+        <pre><code class="language-csharp">[Test]
+public void 餘額不足要擋下()
+{
+    // 因為 IAccountRepository 是介面，Mock 直接做
+    var mockRepo = new Mock&lt;IAccountRepository&gt;();
+    mockRepo.Setup(r =&gt; r.Get(1)).Returns(new Account { Id = 1, Balance = 50 });
+    mockRepo.Setup(r =&gt; r.Get(2)).Returns(new Account { Id = 2, Balance = 0 });
+
+    var service = new TransferService(mockRepo.Object);
+    Assert.Throws&lt;Exception&gt;(() =&gt; service.Transfer(1, 2, 100));
+}</code></pre>
+      </div>
+
+      <p>跟 N-Tier 比，<strong>少了「要先把 Repository 改成介面」這個前置步驟</strong>。但本質上 Mock 設定還是一樣多。</p>
+
+      <div id="ch4-3"></div>
+      <h3>4.3 還沒解決的問題</h3>
+
+      <div class="callout bad">
+        <span class="callout-title">🔴 小明的 bug 還是會發生</span>
+        <p>因為 <code>Account</code> 還是貧血模型（<code>Balance</code> 還是 <code>public set;</code>）。<br>
+        <code>BonusService.AddBonus()</code> 一樣可以直接改 Balance 為負數。<br>
+        Clean Architecture <strong>沒解決這個問題</strong>。</p>
+      </div>
+
+      <p>Clean Architecture 解決的是<strong>「技術依賴的方向」</strong>：DB、框架可以換。<br>
+      但業務規則還是寫在 Service 裡。<strong>這正是 DDD 要解決的事</strong>。</p>
+    </section>
+
+    <!-- ===== Ch 5 ===== -->
+    <section id="ch5">
+      <h2>第 5 章：DDD 寫法</h2>
+      <p>DDD 的核心動作只有一個：<strong>把業務規則從 Service 搬進 Account 自己</strong>。</p>
+
+      <div id="ch5-1"></div>
+      <h3>5.1 把規則搬進 Account</h3>
+
+      <h4><span class="layer-badge lb-dom">Domain 層</span>Account.cs（DDD 版）</h4>
+      <div class="code-with-label">
+        <div class="code-label dom">🟪 Domain 層 — Account 自己保護自己</div>
+        <pre><code class="language-csharp">// ─────────────────────────────────────────────
+// 重點變化：
+// 1. Balance 改成 private set; → 外部不能直接改
+// 2. 加上業務方法 Withdraw / Deposit
+// 3. 規則寫在方法裡 → 任何想動 Balance 的人都繞不過
+// ─────────────────────────────────────────────
+public class Account
+{
+    public int Id { get; private set; }
+    public decimal Balance { get; private set; }      // ← 只能讀，不能從外部改
+    public bool IsFrozen { get; private set; }
+    public decimal DailyTransferred { get; private set; }
+
+    // ===== 業務方法 1：扣款 =====
+    public void Withdraw(decimal amount)
+    {
+        // 規則 1：金額必須 &gt; 0
+        if (amount &lt;= 0)
+            throw new DomainException("金額必須大於 0");
+
+        // 規則 2：帳戶不能凍結
+        if (IsFrozen)
+            throw new DomainException("帳戶已凍結");
+
+        // 規則 3：餘額必須足夠
+        if (Balance &lt; amount)
+            throw new DomainException("餘額不足");
+
+        // 規則 4：單日累計上限
+        if (DailyTransferred + amount &gt; 1_000_000)
+            throw new DomainException("超過單日上限");
+
+        // 通過所有檢查才能改自己的狀態
+        Balance -= amount;
+        DailyTransferred += amount;
+    }
+
+    // ===== 業務方法 2：存款 =====
+    public void Deposit(decimal amount)
+    {
+        if (amount &lt;= 0)
+            throw new DomainException("金額必須大於 0");
+        Balance += amount;
+    }
+
+    // ===== 業務方法 3：轉帳給別人（涉及兩個帳戶） =====
+    public void TransferTo(Account other, decimal amount)
+    {
+        if (other.Id == this.Id)
+            throw new DomainException("不能轉給自己");
+
+        this.Withdraw(amount);     // 自己扣（會跑所有規則）
+        other.Deposit(amount);     // 對方加
+    }
+}</code></pre>
+      </div>
+
+      <h4><span class="layer-badge lb-app">Application 層</span>TransferService.cs（DDD 版）</h4>
+      <div class="code-with-label">
+        <div class="code-label app">🟧 Service 層變成超薄一層</div>
+        <pre><code class="language-csharp">// ─────────────────────────────────────────────
+// 注意：這裡完全沒有業務規則了！
+// Service 只做「拿資料 → 呼叫 Domain → 存回去」
+// ─────────────────────────────────────────────
+public class TransferService
+{
+    private readonly IAccountRepository _repo;
+
+    public TransferService(IAccountRepository repo) =&gt; _repo = repo;
+
+    public void Transfer(int fromId, int toId, decimal amount)
+    {
+        // 1. 拿資料
+        var from = _repo.Get(fromId);
+        var to = _repo.Get(toId);
+
+        // 2. 把工作交給 Domain（規則都在 Account 內）
+        from.TransferTo(to, amount);
+
+        // 3. 存回去
+        _repo.Save(from);
+        _repo.Save(to);
+    }
+}</code></pre>
+      </div>
+
+      <div id="ch5-2"></div>
+      <h3>5.2 同一個 bug 寫不出來</h3>
+      <p>小明還是要做 BonusService。他試圖寫：</p>
+
+      <div class="code-with-label">
+        <div class="code-label app">小明試圖寫 bug</div>
+        <pre><code class="language-csharp">public void AddBonus(int accountId, decimal bonus)
+{
+    var account = _repo.Get(accountId);
+    account.Balance += bonus;   // ← 編譯錯誤！
+    //      ↑ Balance is a 'private set' property
+    _repo.Save(account);
+}</code></pre>
+      </div>
+
+      <div class="callout good">
+        <span class="callout-title">✅ 編譯就擋下來了</span>
+        <p>因為 <code>Balance</code> 是 <code>private set;</code>，<strong>任何外部程式碼都無法直接賦值</strong>。<br>
+        小明只能用 <code>account.Deposit(bonus)</code>，而 <code>Deposit</code> 內部會檢查 <code>amount &lt;= 0</code>。<br>
+        <strong>規則跟資料綁在一起，無法繞過</strong>。</p>
+      </div>
+
+      <div class="story">
+        <div class="story-tag">關鍵差異</div>
+        <p style="margin-bottom: 0;">N-Tier 的規則寫在 <strong>「動作（Service）」</strong> 上 — 只保護那一個入口。<br>
+        DDD 的規則寫在 <strong>「資料（Account）」</strong> 上 — 保護所有入口。<br>
+        這就是 DDD 比 N-Tier 安全的根本原因。</p>
+      </div>
+
+      <div id="ch5-3"></div>
+      <h3>5.3 測試變超簡單</h3>
+
+      <div class="side-by-side">
+        <div class="side-bad">
+          <h4>❌ N-Tier 測試「餘額不足」</h4>
+          <pre style="margin: 0.5rem 0;"><code class="language-csharp" style="font-size: 0.78rem;">[Test]
+public void Test()
+{
+    var mock = new Mock&lt;IAccountRepository&gt;();
+    mock.Setup(r =&gt; r.Get(1))
+        .Returns(new Account {
+            Id=1, Balance=50 });
+    mock.Setup(r =&gt; r.Get(2))
+        .Returns(new Account {
+            Id=2, Balance=0 });
+
+    var svc = new TransferService(
+        mock.Object);
+
+    Assert.Throws&lt;Exception&gt;(() =&gt;
+        svc.Transfer(1, 2, 100));
+}</code></pre>
+          <p style="font-size: 0.85rem; margin-bottom: 0;"><strong>15 行</strong>，需要 Mock，要建 Service。</p>
+        </div>
+        <div class="side-good">
+          <h4>✅ DDD 測試「餘額不足」</h4>
+          <pre style="margin: 0.5rem 0;"><code class="language-csharp" style="font-size: 0.78rem;">[Test]
+public void Test()
+{
+    var account = new Account(
+        balance: 50);
+
+    Assert.Throws&lt;DomainException&gt;(
+        () =&gt; account.Withdraw(100));
+}</code></pre>
+          <p style="font-size: 0.85rem; margin-bottom: 0;"><strong>4 行</strong>，沒 Mock，沒 Service，沒 DB。<br>純粹測「規則」本身。</p>
+        </div>
+      </div>
+
+      <div class="callout good">
+        <span class="callout-title">✅ DDD 為什麼好測試</span>
+        <p>因為業務規則被搬到「<strong>沒有外部依賴</strong>」的 <code>Account</code> 裡。<br>
+        <code>Account</code> 不依賴 Repository、不依賴 DB、不依賴任何框架。<br>
+        所以測試只要 <code>new Account()</code>，呼叫方法、驗結果。完全沒有 Mock 的必要。</p>
+      </div>
+    </section>
+
+    <!-- ===== Ch 6 ===== -->
+    <section id="ch6">
+      <h2>第 6 章：你最大的疑問</h2>
+
+      <div id="ch6-1"></div>
+      <h3>6.1 「換 DB 真的有差嗎？N-Tier 不是也只改 Repository？」</h3>
+      <p>你問得很好，這是一個常見誤解。先說結論：<strong>如果你的 N-Tier 寫得很乾淨，差異不大。但實務上很少這麼乾淨</strong>。</p>
+
+      <h4>真正的差異：「業務邏輯有沒有沾到 DB」</h4>
+
+      <div class="code-with-label">
+        <div class="code-label app">🟧 N-Tier 常見的「不乾淨 Service」</div>
+        <pre><code class="language-csharp">public class TransferService
+{
+    private readonly DbContext _db;  // ← 注意：直接拿 EF DbContext
+
+    public void Transfer(int fromId, int toId, decimal amount)
+    {
+        // 用 LINQ to EF 寫查詢
+        var from = _db.Accounts
+                      .Include(a =&gt; a.Transactions)        // ← EF 特有
+                      .AsTracking()                         // ← EF 特有
+                      .FirstOrDefault(a =&gt; a.Id == fromId);
+
+        from.Balance -= amount;
+        _db.SaveChanges();   // ← EF 特有
+    }
+}</code></pre>
+      </div>
+
+      <div class="callout bad">
+        <span class="callout-title">🔴 換成 Dapper 會發生什麼？</span>
+        <p><code>Include</code>、<code>AsTracking</code>、<code>SaveChanges</code> 全部要拿掉，因為 Dapper 沒這些。<br>
+        <strong>Service 整個要重寫</strong>。N-Tier 寫到後期幾乎都會變這樣。</p>
+      </div>
+
+      <div class="code-with-label">
+        <div class="code-label dom">🟪 DDD 的 Domain 完全乾淨</div>
+        <pre><code class="language-csharp">public class Account
+{
+    public decimal Balance { get; private set; }
+
+    public void Withdraw(decimal amount)
+    {
+        if (Balance &lt; amount) throw new DomainException("餘額不足");
+        Balance -= amount;
+    }
+    // ↑ 這個檔案裡沒有 EF、沒有 Dapper、沒有 SQL
+    // 連「DB」這個概念都不存在
+    // 換 DB 這個檔案永遠不用動
+}</code></pre>
+      </div>
+
+      <div class="story">
+        <div class="story-tag">真正的差異</div>
+        <p style="margin-bottom: 0;">不是「N-Tier 換 DB 也只改 Repository」對不對的問題，<strong>而是業務邏輯有沒有偷偷沾到 DB 的特性</strong>。<br>
+        N-Tier 沒有強制隔離，工程師圖方便就會在 Service 用 EF 的功能，<em>實務上幾乎一定會發生</em>。<br>
+        DDD 的 Domain 層因為「<em>不允許參考任何 ORM</em>」，從根本上禁止這件事。</p>
+      </div>
+
+      <div id="ch6-2"></div>
+      <h3>6.2 「層之間還是會互相呼叫，那 CA/DDD 跟 N-Tier 差別在哪？」</h3>
+      <p>這是你最重要的疑問。答案是：<strong>「呼叫」沒消失，但「呼叫的方向」變了</strong>。</p>
+
+      <h4>N-Tier：直接依賴下層的具體類別</h4>
+      <div class="diagram">
+        <svg viewBox="0 0 600 200" xmlns="http://www.w3.org/2000/svg" style="max-width: 100%; height: auto;">
+          <rect x="40" y="20" width="120" height="50" rx="6" fill="#dbeafe" stroke="#1e40af" stroke-width="2"/>
+          <text x="100" y="50" text-anchor="middle" font-size="13" font-weight="700" fill="#1e40af">Controller</text>
+
+          <rect x="220" y="20" width="160" height="50" rx="6" fill="#fef3c7" stroke="#92400e" stroke-width="2"/>
+          <text x="300" y="50" text-anchor="middle" font-size="13" font-weight="700" fill="#92400e">TransferService</text>
+
+          <rect x="430" y="20" width="160" height="50" rx="6" fill="#d1fae5" stroke="#065f46" stroke-width="2"/>
+          <text x="510" y="50" text-anchor="middle" font-size="13" font-weight="700" fill="#065f46">AccountRepository</text>
+
+          <path d="M 160 45 L 215 45" stroke="#dc2626" stroke-width="2.5" marker-end="url(#nt1)"/>
+          <path d="M 380 45 L 425 45" stroke="#dc2626" stroke-width="2.5" marker-end="url(#nt1)"/>
+
+          <text x="187" y="90" text-anchor="middle" font-size="11" fill="#dc2626" font-weight="600">直接 new</text>
+          <text x="402" y="90" text-anchor="middle" font-size="11" fill="#dc2626" font-weight="600">直接 new</text>
+
+          <text x="300" y="140" text-anchor="middle" font-size="13" font-weight="700" fill="#1c1917">每一層直接知道下一層的具體類別</text>
+          <text x="300" y="165" text-anchor="middle" font-size="11" fill="#78716c">換實作 → 上一層也要改</text>
+
+          <defs>
+            <marker id="nt1" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto">
+              <path d="M 0 0 L 10 5 L 0 10 z" fill="#dc2626"/>
+            </marker>
+          </defs>
+        </svg>
+      </div>
+
+      <h4>Clean Architecture / DDD：依賴介面，方向反轉</h4>
+      <div class="diagram">
+        <svg viewBox="0 0 600 280" xmlns="http://www.w3.org/2000/svg" style="max-width: 100%; height: auto;">
+          <rect x="40" y="20" width="120" height="50" rx="6" fill="#dbeafe" stroke="#1e40af" stroke-width="2"/>
+          <text x="100" y="50" text-anchor="middle" font-size="13" font-weight="700" fill="#1e40af">Controller</text>
+
+          <rect x="220" y="20" width="160" height="50" rx="6" fill="#fef3c7" stroke="#92400e" stroke-width="2"/>
+          <text x="300" y="50" text-anchor="middle" font-size="13" font-weight="700" fill="#92400e">TransferService</text>
+
+          <rect x="220" y="120" width="160" height="40" rx="6" fill="white" stroke="#92400e" stroke-width="2" stroke-dasharray="5 3"/>
+          <text x="300" y="146" text-anchor="middle" font-size="12" font-weight="700" fill="#92400e">IAccountRepository</text>
+
+          <rect x="430" y="120" width="160" height="40" rx="6" fill="#d1fae5" stroke="#065f46" stroke-width="2"/>
+          <text x="510" y="146" text-anchor="middle" font-size="12" font-weight="700" fill="#065f46">SqlAccountRepository</text>
+
+          <path d="M 160 45 L 215 45" stroke="#16a34a" stroke-width="2.5" marker-end="url(#ca1)"/>
+          <path d="M 300 70 L 300 115" stroke="#16a34a" stroke-width="2.5" stroke-dasharray="5 3" marker-end="url(#ca1)"/>
+          <path d="M 425 140 L 385 140" stroke="#16a34a" stroke-width="2.5" marker-end="url(#ca1)"/>
+
+          <text x="187" y="90" text-anchor="middle" font-size="11" fill="#16a34a" font-weight="600">用</text>
+          <text x="320" y="100" text-anchor="start" font-size="11" fill="#16a34a" font-weight="600">依賴介面</text>
+          <text x="405" y="115" text-anchor="middle" font-size="11" fill="#16a34a" font-weight="600">實作</text>
+
+          <text x="300" y="200" text-anchor="middle" font-size="13" font-weight="700" fill="#1c1917">Service 只認 IAccountRepository 介面</text>
+          <text x="300" y="225" text-anchor="middle" font-size="13" font-weight="700" fill="#1c1917">SqlAccountRepository「往上」實作這個介面</text>
+          <text x="300" y="252" text-anchor="middle" font-size="11" fill="#16a34a" font-weight="600">換實作 → Service 完全不用動</text>
+
+          <defs>
+            <marker id="ca1" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto">
+              <path d="M 0 0 L 10 5 L 0 10 z" fill="#16a34a"/>
+            </marker>
+          </defs>
+        </svg>
+      </div>
+
+      <h4>具體例子說清楚</h4>
+      <table>
+        <thead><tr><th>問題</th><th>N-Tier</th><th>Clean Architecture / DDD</th></tr></thead>
+        <tbody>
+          <tr>
+            <td>Service 認誰？</td>
+            <td><code>SqlAccountRepository</code>（具體類別）</td>
+            <td><code>IAccountRepository</code>（介面）</td>
+          </tr>
+          <tr>
+            <td>換成 MongoDB 要動什麼？</td>
+            <td>新增 <code>MongoAccountRepository</code><br><strong>＋</strong> 改 <code>TransferService</code> 建構子</td>
+            <td>新增 <code>MongoAccountRepository</code><br><strong>Service 完全不動</strong></td>
+          </tr>
+          <tr>
+            <td>測試要 Mock 什麼？</td>
+            <td>整個 <code>SqlAccountRepository</code>，但它不是介面 → 改寫</td>
+            <td>Mock <code>IAccountRepository</code> 介面，直接行</td>
+          </tr>
+          <tr>
+            <td>業務規則放哪？</td>
+            <td>Service（資料外面）</td>
+            <td><strong>Account 自己（資料裡面）</strong></td>
+          </tr>
+          <tr>
+            <td>能不能繞過規則？</td>
+            <td>能，別的 Service 直接改 Balance</td>
+            <td>不能，Balance 是 private set</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <div class="callout info">
+        <span class="callout-title">💡 一句話講清楚差異</span>
+        <p><strong>N-Tier</strong>：層之間直接呼叫具體類別，業務規則寫在動作上。<br>
+        <strong>Clean Architecture</strong>：層之間呼叫介面（依賴反轉），業務規則仍在動作上。<br>
+        <strong>DDD</strong>：層之間呼叫介面，<strong>業務規則搬進資料本身</strong>。</p>
+      </div>
+    </section>
+
+    <!-- ===== Ch 7 ===== -->
+    <section id="ch7">
+      <h2>第 7 章：總結 — 一張圖看懂</h2>
+
+      <table>
+        <thead>
+          <tr>
+            <th>關注點</th>
+            <th>N-Tier</th>
+            <th>Clean Architecture</th>
+            <th>DDD</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Account 物件</td>
+            <td>貧血模型（純資料）</td>
+            <td>貧血模型（純資料）</td>
+            <td><strong>有業務方法</strong></td>
+          </tr>
+          <tr>
+            <td>業務規則放哪</td>
+            <td>Service</td>
+            <td>Service / UseCase</td>
+            <td><strong>Account 自己</strong></td>
+          </tr>
+          <tr>
+            <td>能繞過規則嗎</td>
+            <td>能（別的 Service 直接改）</td>
+            <td>能（同上）</td>
+            <td><strong>不能（編譯擋住）</strong></td>
+          </tr>
+          <tr>
+            <td>Service 依賴</td>
+            <td>具體 Repository</td>
+            <td>IRepository 介面</td>
+            <td>IRepository 介面</td>
+          </tr>
+          <tr>
+            <td>換 DB 影響</td>
+            <td>可能要改 Service</td>
+            <td>只改 Infrastructure</td>
+            <td>只改 Infrastructure</td>
+          </tr>
+          <tr>
+            <td>測試核心邏輯</td>
+            <td>要 Mock Repository</td>
+            <td>要 Mock 介面</td>
+            <td><strong>不需要 Mock</strong></td>
+          </tr>
+          <tr>
+            <td>適用</td>
+            <td>簡單 CRUD</td>
+            <td>中型專案</td>
+            <td>業務複雜的專案</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <h3>三句話帶走</h3>
+      <ol style="margin-left: 1.5rem; color: var(--text-soft);">
+        <li><strong>N-Tier</strong>：把程式碼分成幾層，方便組織。但業務規則散落在 Service 裡，容易被繞過。</li>
+        <li><strong>Clean Architecture</strong>：在 N-Tier 上加「依賴反轉」— 用介面隔離。換技術不用動核心。</li>
+        <li><strong>DDD</strong>：在 Clean Architecture 上加「業務內聚」— 把規則綁在資料上。資料自我保護。</li>
+      </ol>
+
+      <h3>你會記得的關鍵畫面</h3>
+      <div class="story">
+        <div class="story-tag">記住這個</div>
+        <p><strong>看 Account 的 Balance 屬性</strong>：</p>
+        <ul style="margin-left: 1.5rem;">
+          <li><code>public decimal Balance { get; set; }</code> → N-Tier / 貧血模型</li>
+          <li><code>public decimal Balance { get; private set; }</code> + 業務方法 → DDD</li>
+        </ul>
+        <p style="margin-bottom: 0;">就一個 <code>private</code> 的差別，<strong>整個架構哲學就不同了</strong>。</p>
+      </div>
+
+      <h3>下一步學什麼</h3>
+      <ol style="margin-left: 1.5rem; color: var(--text-soft);">
+        <li>找一個你熟的業務場景（學校選課、購物車、訂閱訂單），用三種架構各寫一次。</li>
+        <li>每寫完一次就試圖「<em>讓另一個工程師繞過規則</em>」，看你的設計擋不擋得住。</li>
+        <li>寫單元測試。注意 N-Tier 跟 DDD 的測試行數差距。</li>
+        <li>寫完之後，再回去看其他 DDD 教學（Aggregate、Bounded Context、Domain Event），會突然全部看得懂。</li>
+      </ol>
+    </section>
+
+  </main>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-csharp.min.js"></script>
+<script>
+  // TOC active highlight
+  const tocLinks = document.querySelectorAll('.toc a');
+  const sections = Array.from(tocLinks).map(a => document.querySelector(a.getAttribute('href'))).filter(Boolean);
+
+  function updateActive() {
+    const scrollY = window.scrollY + 120;
+    let current = sections[0];
+    for (const sec of sections) {
+      if (sec.offsetTop <= scrollY) current = sec;
+    }
+    tocLinks.forEach(a => {
+      a.classList.toggle('active', a.getAttribute('href') === '#' + current.id);
+    });
+  }
+
+  window.addEventListener('scroll', updateActive);
+  updateActive();
+</script>
+
+</body>
+</html>

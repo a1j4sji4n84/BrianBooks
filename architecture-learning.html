@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>從零學 N-Tier、Clean Architecture、DDD（給新手版）</title>
+<title>從零學 N-Tier、Clean Architecture、DDD</title>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css">
 <style>
   :root {
@@ -361,10 +361,16 @@
     <a href="#ch4-1" class="sub">4.1 核心觀念：依賴反轉</a>
     <a href="#ch4-2" class="sub">4.2 程式碼變化</a>
     <a href="#ch4-3" class="sub">4.3 還沒解決的問題</a>
+    <a href="#ch4-4" class="sub">4.4 介面要放哪一層？</a>
+    <a href="#ch4-5" class="sub">4.5 跨層傳資料：DTO</a>
     <a href="#ch5">第 5 章：DDD 寫法</a>
     <a href="#ch5-1" class="sub">5.1 把規則搬進 Account</a>
     <a href="#ch5-2" class="sub">5.2 同一個 bug 寫不出來</a>
     <a href="#ch5-3" class="sub">5.3 測試變超簡單</a>
+    <a href="#ch5-4" class="sub">5.4 兩個動作要一起成功</a>
+    <a href="#ch5-5" class="sub">5.5 用型別擋 bug：Value Object</a>
+    <a href="#ch5-6" class="sub">5.6 誰跟誰是一夥的：Aggregate</a>
+    <a href="#ch5-7" class="sub">5.7 大系統怎麼切：Bounded Context</a>
     <a href="#ch6">第 6 章：你最大的疑問</a>
     <a href="#ch6-1" class="sub">6.1 換 DB 真的有差嗎？</a>
     <a href="#ch6-2" class="sub">6.2 還是會互相呼叫，差在哪？</a>
@@ -913,11 +919,152 @@ public void 餘額不足要擋下()
         <span class="callout-title">🔴 小明的 bug 還是會發生</span>
         <p>因為 <code>Account</code> 還是貧血模型（<code>Balance</code> 還是 <code>public set;</code>）。<br>
         <code>BonusService.AddBonus()</code> 一樣可以直接改 Balance 為負數。<br>
-        Clean Architecture <strong>沒解決這個問題</strong>。</p>
+        本章的範例<strong>還沒解決這個問題</strong>。</p>
       </div>
 
-      <p>Clean Architecture 解決的是<strong>「技術依賴的方向」</strong>：DB、框架可以換。<br>
-      但業務規則還是寫在 Service 裡。<strong>這正是 DDD 要解決的事</strong>。</p>
+      <p>Clean Architecture 提供了「依賴方向反轉」的骨架 — DB、框架可以換、單元測試也好寫。<br>
+      但「<strong>業務規則內聚到 Entity 自己</strong>」這個動作，本章還沒示範怎麼做 — 第 5 章 DDD 來補完。<br>
+      在進入下一章之前，先補兩個 Clean Architecture 容易踩坑的細節。</p>
+
+      <div id="ch4-4"></div>
+      <h3>4.4 介面要放哪一層？</h3>
+      <p>「依賴反轉」最容易誤解的地方就在這。<strong>程式碼裡有 interface 不代表就是 Clean Architecture</strong>。關鍵在：interface 定義在<em>哪一層</em>。</p>
+
+      <h4>錯誤寫法：interface 跟實作住在同一層</h4>
+      <div class="code-with-label">
+        <div class="code-label inf">🟢 Infrastructure/IAccountRepository.cs（interface 在這）</div>
+        <pre><code class="language-csharp">// interface 跟下面的 SqlAccountRepository 一起住在 Infrastructure
+public interface IAccountRepository
+{
+    Account Get(int id);
+    void Save(Account account);
+}</code></pre>
+      </div>
+      <div class="code-with-label">
+        <div class="code-label inf">🟢 Infrastructure/SqlAccountRepository.cs（實作也在這）</div>
+        <pre><code class="language-csharp">public class SqlAccountRepository : IAccountRepository
+{
+    public Account Get(int id) { /* SQL */ }
+    public void Save(Account a) { /* SQL */ }
+}</code></pre>
+      </div>
+      <div class="code-with-label">
+        <div class="code-label app">🟧 Application/TransferService.cs</div>
+        <pre><code class="language-csharp">public class TransferService
+{
+    private readonly IAccountRepository _repo;
+    // ↑ 看起來用了 interface 沒錯，但這個 interface 是去 Infrastructure 借的
+    // 所以 Application 還是要先「認得」Infrastructure 才能用
+    // 依賴箭頭沒變：Application → Infrastructure
+}</code></pre>
+      </div>
+      <div class="callout bad">
+        <span class="callout-title">🔴 這只是「假的依賴反轉」</span>
+        <p>有 interface ≠ 依賴反轉。如果 interface 跟實作住在同一層，依賴方向沒變，只是中間多了一個轉接器，<strong>本質上跟 N-Tier 沒差</strong>。</p>
+      </div>
+
+      <h4>正確寫法：interface 放在「需要它的那一層」</h4>
+      <div class="code-with-label">
+        <div class="code-label app">🟧 Application/IAccountRepository.cs（interface 跟使用者住一起）</div>
+        <pre><code class="language-csharp">// 介面定義在 Application — 因為這裡才需要它
+public interface IAccountRepository
+{
+    Account Get(int id);
+    void Save(Account account);
+}</code></pre>
+      </div>
+      <div class="code-with-label">
+        <div class="code-label app">🟧 Application/TransferService.cs</div>
+        <pre><code class="language-csharp">public class TransferService
+{
+    private readonly IAccountRepository _repo;
+    // ↑ 這個 interface 是 Application 自己定義的
+    // 完全不需要看 Infrastructure 一眼
+}</code></pre>
+      </div>
+      <div class="code-with-label">
+        <div class="code-label inf">🟢 Infrastructure/SqlAccountRepository.cs（實作要去 Application 拿規格）</div>
+        <pre><code class="language-csharp">public class SqlAccountRepository : IAccountRepository
+{
+    // 這個 class 必須先「認得」Application 的 IAccountRepository 才能實作
+    // 所以依賴箭頭：Infrastructure → Application（外圈依賴內圈）
+    public Account Get(int id) { /* SQL */ }
+    public void Save(Account a) { /* SQL */ }
+}</code></pre>
+      </div>
+      <div class="callout good">
+        <span class="callout-title">✅ 真的依賴反轉</span>
+        <p>Application 自己定 interface，Infrastructure 必須「配合」這個 interface 來做事。<br>
+        依賴箭頭從原本的「上往下」反過來變成「下往上」（外圈依賴內圈）。<strong>這就是 Clean Architecture 的核心</strong>。</p>
+      </div>
+
+      <div class="analogy">
+        <div class="analogy-title">用裝修比喻</div>
+        <p style="margin-bottom: 0;"><strong>假反轉</strong>：你跑去水電工的店，拿水電工準備好的合約規格給他簽 — 你還是被水電工綁著。<br>
+        <strong>真反轉</strong>：你寫好你家要什麼（規格），水電工照你寫的規格做 — 換哪個水電工都可以，因為規格是你訂的。</p>
+      </div>
+
+      <div id="ch4-5"></div>
+      <h3>4.5 跨層傳資料：用 DTO 不要傳 Entity</h3>
+      <p>看一個常見的寫法：</p>
+      <div class="code-with-label">
+        <div class="code-label web">🟦 Web/AccountController.cs</div>
+        <pre><code class="language-csharp">[HttpGet("{id}")]
+public Account Get(int id)
+{
+    return _service.GetAccount(id);
+    // ↑ 直接把 Account 物件丟出去當 API 回應
+}</code></pre>
+      </div>
+      <p>看起來合理對不對？但 Clean Architecture 不建議這樣做。為什麼？</p>
+
+      <ol style="margin-left: 1.5rem; color: var(--text-soft);">
+        <li><strong>API 規格綁住業務邏輯</strong>：你想把 API 欄位從 <code>balance</code> 改成 <code>availableAmount</code>，就得動 <code>Account</code>。但 Account 是業務概念，不該為 API 改。</li>
+        <li><strong>意外洩漏內部欄位</strong>：Account 內部可能有 <code>DailyTransferred</code>（單日累計）、<code>InternalNote</code>（內部備註），你不見得想讓前端看到。但序列化（轉成 JSON）時會被默默全部讀出來。</li>
+        <li><strong>API 加版本變難搞</strong>：如果未來 v1 跟 v2 API 欄位不一樣，<code>Account</code> 會變成「兩個 API 都要遷就」的怪物。</li>
+      </ol>
+
+      <p>正確做法：跨層傳資料用 <strong>DTO</strong>。</p>
+
+      <div class="term">
+        <div class="term-name">術語</div>
+        <span class="term-en">DTO</span>
+        <span class="term-meta">Data Transfer Object，資料傳輸物件</span>
+        <p>一個專門「跨層裝資料」的純資料盒子。沒有業務邏輯，只有屬性。每一層可以有自己的 DTO，互相不干擾。</p>
+      </div>
+
+      <div class="code-with-label">
+        <div class="code-label web">🟦 Web/Dtos/AccountDto.cs（API 自己的資料盒子）</div>
+        <pre><code class="language-csharp">public class AccountDto
+{
+    public int Id { get; set; }
+    public decimal Balance { get; set; }
+    // 注意：DailyTransferred 不放在這 → 前端看不到
+    // 想改 API 欄位名就直接改這個 class，不會動到 Account
+}</code></pre>
+      </div>
+      <div class="code-with-label">
+        <div class="code-label web">🟦 Web/AccountController.cs（修正版）</div>
+        <pre><code class="language-csharp">[HttpGet("{id}")]
+public AccountDto Get(int id)
+{
+    var account = _service.GetAccount(id);
+    // 把 Account（Domain 物件）轉成 AccountDto（API 物件）才回傳
+    return new AccountDto
+    {
+        Id = account.Id,
+        Balance = account.Balance
+    };
+}</code></pre>
+      </div>
+
+      <div class="analogy">
+        <div class="analogy-title">用寄包裹比喻</div>
+        <p style="margin-bottom: 0;"><strong>不用 DTO</strong>：你把整個房間（Account）打包寄給朋友 — 朋友會收到一堆他根本不需要的東西，連你的內部備註都會看到。<br>
+        <strong>用 DTO</strong>：你只把朋友需要的東西（Id、Balance）放進紙箱寄過去 — 乾淨、隱私、互不影響。</p>
+      </div>
+
+      <p>會多寫一些「轉換」程式碼（Account → AccountDto），但這是換取「Domain 不被外面污染」的代價。實務上有 AutoMapper、Mapster 這類工具可以自動幫你做轉換。</p>
     </section>
 
     <!-- ===== Ch 5 ===== -->
@@ -1091,6 +1238,288 @@ public void Test()
         <p>因為業務規則被搬到「<strong>沒有外部依賴</strong>」的 <code>Account</code> 裡。<br>
         <code>Account</code> 不依賴 Repository、不依賴 DB、不依賴任何框架。<br>
         所以測試只要 <code>new Account()</code>，呼叫方法、驗結果。完全沒有 Mock 的必要。</p>
+      </div>
+
+      <p style="margin-top: 1.5rem;">把規則塞進 <code>Account</code> 只是 DDD 的<em>第一步</em>。下面這幾節是 DDD 還會教你的重要技巧 — 都很實用，少一個都會在實務踩坑。</p>
+
+      <div id="ch5-4"></div>
+      <h3>5.4 兩個動作要一起成功 — Transaction</h3>
+      <p>仔細看 5.1 的 <code>Transfer</code>：</p>
+      <div class="code-with-label">
+        <div class="code-label app">🟧 TransferService.cs（藏著一個嚴重 bug）</div>
+        <pre><code class="language-csharp">public void Transfer(int fromId, int toId, decimal amount)
+{
+    var from = _repo.Get(fromId);
+    var to = _repo.Get(toId);
+    from.TransferTo(to, amount);
+
+    _repo.Save(from);   // ← 假設這行成功，A 的錢扣了
+    _repo.Save(to);     // ← 但這行剛好斷電 / 程式爆炸 / 資料庫掛掉？
+}</code></pre>
+      </div>
+      <div class="callout bad">
+        <span class="callout-title">🔴 真實後果</span>
+        <p>A 帳戶錢扣了，但 B 帳戶錢沒加上去。<strong>錢憑空消失</strong>。<br>
+        生產環境這是 P0 級事故（最嚴重的事故等級）— 銀行直接虧錢。</p>
+      </div>
+
+      <p>轉帳必須做到：<strong>要嘛兩邊都成功，要嘛兩邊都失敗，沒有「只成功一半」這種狀態</strong>。這個保證叫做 <strong>Transaction</strong>。</p>
+
+      <div class="term">
+        <div class="term-name">術語</div>
+        <span class="term-en">Transaction</span>
+        <span class="term-meta">交易（資料庫的）</span>
+        <p>把多個資料庫操作綁成「一組」。要嘛全部寫入成功（叫 <strong>commit，提交</strong>），要嘛全部不算數（叫 <strong>rollback，回滾</strong>，回到動作前的狀態）。資料庫本身就提供這個能力，你只要呼叫它。</p>
+      </div>
+
+      <h4>修正後的寫法</h4>
+      <div class="code-with-label">
+        <div class="code-label app">🟧 TransferService.cs（包進 Transaction）</div>
+        <pre><code class="language-csharp">public void Transfer(int fromId, int toId, decimal amount)
+{
+    using var tx = _db.BeginTransaction();   // ① 開始一個交易
+    try
+    {
+        var from = _repo.Get(fromId);
+        var to = _repo.Get(toId);
+        from.TransferTo(to, amount);
+        _repo.Save(from);
+        _repo.Save(to);
+        tx.Commit();   // ② 全部都做完，正式提交（這時資料才真的寫進 DB）
+    }
+    catch
+    {
+        tx.Rollback(); // ③ 中間任何錯誤，整個操作回到起點，A 的錢不會被扣
+        throw;         //    把錯誤往上拋，讓上層知道這次失敗了
+    }
+}</code></pre>
+      </div>
+
+      <div class="analogy">
+        <div class="analogy-title">用寄錢比喻</div>
+        <p style="margin-bottom: 0;"><strong>沒交易</strong>：你掏錢出來、半路被風吹走 — 你也沒了，朋友也沒收到。<br>
+        <strong>有交易</strong>：銀行櫃員看到你跟朋友的所有動作完成才蓋章；中途出錯，前面動作全部取消、退錢給你。</p>
+      </div>
+
+      <div id="ch5-5"></div>
+      <h3>5.5 用「型別」幫你擋 bug — Value Object</h3>
+      <p>5.1 的 <code>Withdraw</code> 簽章是 <code>Withdraw(decimal amount)</code>。看起來沒問題，但有個隱藏地雷。</p>
+      <p>想像你的銀行做國際生意：</p>
+      <div class="code-with-label">
+        <div class="code-label">隱藏地雷</div>
+        <pre><code class="language-csharp">var ntdAccount = ...;       // 台幣帳戶
+var usdAmount = 100m;       // 100 美金（用 decimal 存）
+
+ntdAccount.Withdraw(usdAmount);
+// ↑ 編譯通過！但意思變成「從台幣帳戶扣 100 元」
+//   程式以為扣 100 美金，實際扣的是 100 元台幣 — 客戶會炸鍋</code></pre>
+      </div>
+      <p><code>decimal</code> 就是個數字，<strong>沒有單位</strong>。100 是台幣還是美金，從程式碼看不出來。這種 bug 跑起來才會發現，發現時可能已經扣錯一堆人錢了。</p>
+      <p>DDD 的解法：把「金額」做成自己的型別。這種型別叫做 <strong>Value Object</strong>。</p>
+
+      <div class="term">
+        <div class="term-name">術語</div>
+        <span class="term-en">Value Object</span>
+        <span class="term-meta">值物件</span>
+        <p>一個只關心「值是什麼」的物件。沒有 ID、不能改值、所有屬性相等就是同一個。<br>
+        例子：「金額」（100 元台幣）、「日期區間」（2026/1/1 ~ 2026/1/31）、「地址」。<br>
+        對比 Entity：Entity 有 ID、有生命週期；Value Object 是「描述性的數值」。</p>
+      </div>
+
+      <div class="code-with-label">
+        <div class="code-label dom">🟪 Domain/Money.cs</div>
+        <pre><code class="language-csharp">// record 是 C# 5+ 的關鍵字，自動產生「不可變」「值相等」的物件
+public sealed record Money(decimal Amount, string Currency);
+
+// Money(100, "NTD") 跟 Money(100, "NTD") 視為同一個（值相等）
+// Money(100, "NTD") 跟 Money(100, "USD") 不同</code></pre>
+      </div>
+
+      <div class="code-with-label">
+        <div class="code-label dom">🟪 Domain/Account.cs（用 Money 取代 decimal）</div>
+        <pre><code class="language-csharp">public class Account
+{
+    public Money Balance { get; private set; }   // ← 不是 decimal 了
+    public bool IsFrozen { get; private set; }
+
+    public void Withdraw(Money amount)
+    {
+        // 多一道檢查：幣別必須一致
+        if (amount.Currency != Balance.Currency)
+            throw new DomainException("幣別不對，不能扣款");
+
+        if (amount.Amount &lt;= 0)
+            throw new DomainException("金額必須大於 0");
+        if (IsFrozen)
+            throw new DomainException("帳戶已凍結");
+        if (Balance.Amount &lt; amount.Amount)
+            throw new DomainException("餘額不足");
+
+        // 重新算 Balance（record 不能改值，所以 new 一個出來）
+        Balance = new Money(Balance.Amount - amount.Amount, Balance.Currency);
+    }
+}</code></pre>
+      </div>
+
+      <div class="callout good">
+        <span class="callout-title">✅ 編譯器幫你擋 bug</span>
+        <p>之前 <code>ntdAccount.Withdraw(100m)</code> 跟 <code>ntdAccount.Withdraw(usdAmount)</code> 都會編譯成功。<br>
+        現在強制要傳 <code>Money</code>，幣別寫在型別裡，<strong>不對的幣別還沒跑就被擋下來</strong>。</p>
+      </div>
+
+      <div class="analogy">
+        <div class="analogy-title">用杯子比喻</div>
+        <p style="margin-bottom: 0;"><strong>用 decimal</strong>：「給我 100」— 100 什麼？水？酒？汽油？分不出來。<br>
+        <strong>用 Money</strong>：「給我 100 杯水」— 一看就知道是什麼。</p>
+      </div>
+
+      <div id="ch5-6"></div>
+      <h3>5.6 誰跟誰是一夥的 — Aggregate</h3>
+      <p>仔細看 5.1 的 <code>account.TransferTo(other, amount)</code>。寫法很簡潔，但藏了一個 DDD 規則問題。</p>
+
+      <p>DDD 把「一定要一起被修改」的物件群組起來，這個群組叫 <strong>Aggregate</strong>。</p>
+
+      <div class="term">
+        <div class="term-name">術語</div>
+        <span class="term-en">Aggregate</span>
+        <span class="term-meta">聚合</span>
+        <p>一群緊密相關的物件，外界把它當<strong>一個整體</strong>看待。<br>
+        例子：一張訂單 + 訂單裡的明細 = 一個 Aggregate。</p>
+      </div>
+
+      <div class="term">
+        <div class="term-name">術語</div>
+        <span class="term-en">Aggregate Root</span>
+        <span class="term-meta">聚合根</span>
+        <p>Aggregate 對外的<strong>唯一入口</strong>。外界只能透過 Aggregate Root 操作裡面的東西。<br>
+        例子：<code>Order</code>（訂單）是 Root，外界要看明細只能透過 <code>order.Items</code>，不能直接 <code>new OrderItem()</code> 自己亂塞。</p>
+      </div>
+
+      <p>本章每個 <code>Account</code> 各自是一個 Aggregate Root。</p>
+
+      <p>DDD 有條重要規則：<strong>一次 Transaction 內，只能修改一個 Aggregate</strong>。但 <code>account.TransferTo(other, amount)</code> 同時改了兩個 <code>Account</code>（兩個 Aggregate Root），違反這條規則。</p>
+
+      <h4>為什麼這條規則重要？</h4>
+      <p>兩個帳戶可能同時被別人修改（多執行緒，就是程式同時做好幾件事）：</p>
+      <ul style="margin-left: 1.5rem; color: var(--text-soft);">
+        <li>程式 1：用戶 A 轉錢給 B，鎖了 A 帳戶，等 B 帳戶釋放</li>
+        <li>程式 2：用戶 B 轉錢給 A，鎖了 B 帳戶，等 A 帳戶釋放</li>
+        <li>結果：兩邊互等 → 系統卡死。這叫 <strong>Deadlock（死鎖）</strong>。</li>
+      </ul>
+
+      <h4>比較安全的寫法：用 Domain Service</h4>
+      <p>把「跨兩個 Aggregate 的邏輯」抽出來放在獨立的 service。</p>
+
+      <div class="term">
+        <div class="term-name">術語</div>
+        <span class="term-en">Domain Service</span>
+        <span class="term-meta">領域服務</span>
+        <p>當一個業務動作<strong>不屬於任何單一 Entity</strong>時，獨立做成一個 service，放在 Domain 層。<br>
+        例子：「轉帳」涉及兩個帳戶 — 放哪一個 Account 都不對 — 抽成 <code>TransferDomainService</code>。</p>
+      </div>
+
+      <div class="code-with-label">
+        <div class="code-label dom">🟪 Domain/TransferDomainService.cs</div>
+        <pre><code class="language-csharp">public class TransferDomainService
+{
+    public void Transfer(Account from, Account to, Money amount)
+    {
+        from.Withdraw(amount);   // 改 Aggregate A
+        to.Deposit(amount);      // 改 Aggregate B
+        // 邏輯不藏在任一 Account 內，而是在「服務」這一層
+        // 兩個 Aggregate 都被改，但邏輯位置很明確
+    }
+}</code></pre>
+      </div>
+
+      <div class="analogy">
+        <div class="analogy-title">用寄禮物比喻</div>
+        <p style="margin-bottom: 0;"><strong><code>account.TransferTo(other)</code></strong>：兩個朋友直接擠在門口遞東西 — 容易撞到、容易吵架（並發問題）。<br>
+        <strong>用 Domain Service</strong>：找一個快遞員幫你們交接 — 雙方不用直接接觸，由第三方協調。</p>
+      </div>
+
+      <div class="callout info">
+        <span class="callout-title">💡 為什麼 5.1 還是用簡化版？</span>
+        <p>因為 <code>account.TransferTo(other)</code> 對<strong>學習</strong>來說最直觀 — 一行就看懂在幹嘛。實務上，量小、規則少時這樣寫也沒事。<br>
+        但業務一複雜、流量一上來，要記得這條規則，把跨 Aggregate 的邏輯抽出來。</p>
+      </div>
+
+      <div id="ch5-7"></div>
+      <h3>5.7 大系統怎麼切？— Bounded Context 與通用語言</h3>
+      <p>到目前為止，DDD 都在教你「怎麼寫好一個 <code>Account</code>」。這是 DDD 的<em>一半</em> — 叫做<strong>戰術設計</strong>（Tactical Design，怎麼寫程式碼）。</p>
+
+      <p>但真實世界的系統不是只有一個 <code>Account</code>。你有訂單、付款、客服、登入、權限、通知……幾十個業務區塊。<strong>怎麼切？</strong></p>
+
+      <p>這就是 DDD 的另一半 — <strong>戰略設計</strong>（Strategic Design，怎麼劃地盤）。</p>
+
+      <h4>同一個詞，不同地方意思不一樣</h4>
+      <p>想像你做一個銀行系統。「使用者」這個詞：</p>
+      <table>
+        <thead><tr><th>在哪個情境</th><th>「使用者」是什麼</th></tr></thead>
+        <tbody>
+          <tr><td>登入系統</td><td>一個帳號（含 email、密碼、登入紀錄）</td></tr>
+          <tr><td>轉帳系統</td><td>一個帳戶持有人（含身分證、手機、地址）</td></tr>
+          <tr><td>客服系統</td><td>一個被服務的對象（含問題紀錄、滿意度評分）</td></tr>
+        </tbody>
+      </table>
+      <p>如果你硬要把這三種「使用者」做成同一個 <code>User</code> class，這個 class 會塞滿亂七八糟的欄位 — 一個跟轉帳完全無關的「滿意度評分」屬性，掛在轉帳要用的 <code>User</code> 物件上。<strong>什麼跟什麼？</strong></p>
+
+      <p>DDD 的主張：<strong>這三種「使用者」是不一樣的東西，應該用不同的 class，住在不同的「世界」裡</strong>。每個世界叫做 <strong>Bounded Context</strong>。</p>
+
+      <div class="term">
+        <div class="term-name">術語</div>
+        <span class="term-en">Bounded Context</span>
+        <span class="term-meta">有界上下文</span>
+        <p>一個業務區塊有自己的詞彙、規則、模型。<strong>同一個詞在不同 Bounded Context 可以是完全不同的東西</strong>。</p>
+      </div>
+
+      <div class="code-with-label">
+        <div class="code-label">三個世界</div>
+        <pre><code class="language-plaintext">Identity 世界（登入區塊）
+  └─ User { Email, Password, LastLoginAt }
+
+Banking 世界（轉帳區塊）
+  └─ Account { OwnerName, IdNumber, Balance, IsFrozen }
+
+Support 世界（客服區塊）
+  └─ Customer { Tickets, SatisfactionScore }
+
+三個世界各做各的。
+跨世界要傳資料時，用事件或 API 把對方需要的部分翻譯一下傳過去。</code></pre>
+      </div>
+
+      <h4>程式碼長得跟業務一樣 — Ubiquitous Language</h4>
+      <p>每個 Bounded Context 裡面，<strong>業務人員、設計師、工程師都用同一套詞彙</strong>。</p>
+
+      <div class="term">
+        <div class="term-name">術語</div>
+        <span class="term-en">Ubiquitous Language</span>
+        <span class="term-meta">通用語言</span>
+        <p>所有人 — 業務、PM、設計師、工程師 — 都用同一套詞彙。<strong>讓程式碼長得跟業務文件一樣</strong>，溝通不會走樣。</p>
+      </div>
+
+      <table>
+        <thead><tr><th>業務說</th><th>程式碼寫</th><th>不要寫成</th></tr></thead>
+        <tbody>
+          <tr><td>核章</td><td><code>SealOff()</code></td><td><code>ApproveDocument()</code>（自創詞）</td></tr>
+          <tr><td>催收</td><td><code>Collect()</code></td><td><code>RetrieveDelinquentAccount()</code>（過度翻譯）</td></tr>
+          <tr><td>對帳</td><td><code>Reconcile()</code></td><td><code>CheckBalance()</code>（不準確）</td></tr>
+        </tbody>
+      </table>
+
+      <p>業務說「核章」，工程師心裡 OS「就是 approve 嘛」自己翻譯成 <code>ApproveDocument()</code> — 結果業務看 code 看不懂、工程師看業務文件也看不懂，<strong>每次溝通都要再翻譯一次</strong>，誤差不斷累積。</p>
+
+      <div class="analogy">
+        <div class="analogy-title">用旅遊比喻</div>
+        <p style="margin-bottom: 0;"><strong>沒做 Bounded Context</strong>：拿一張世界地圖，到每個國家亂走 — 路名不認識、交通規則不懂、到處迷路。<br>
+        <strong>有做 Bounded Context</strong>：每個國家用當地的地圖，符合當地路名跟交通規則 — 在那個國家就熟門熟路。</p>
+      </div>
+
+      <div class="callout warn">
+        <span class="callout-title">⚠️ 沒做 Strategic Design 的「DDD」是假 DDD</span>
+        <p>很多團隊說自己在做 DDD，但其實只是把 N-Tier 的 <code>Service</code> 改名叫 <code>Entity</code>、加幾個業務方法。<br>
+        <strong>沒有 Bounded Context、沒有通用語言，整個系統一個大 Domain 模型 — Aggregate 會無限膨脹、循環依賴、跟 N-Tier 沒兩樣</strong>。<br>
+        Strategic Design 才是 DDD 真正的價值。</p>
       </div>
     </section>
 
@@ -1324,8 +1753,8 @@ public void Test()
       <h3>三句話帶走</h3>
       <ol style="margin-left: 1.5rem; color: var(--text-soft);">
         <li><strong>N-Tier</strong>：把程式碼分成幾層，方便組織。但業務規則散落在 Service 裡，容易被繞過。</li>
-        <li><strong>Clean Architecture</strong>：在 N-Tier 上加「依賴反轉」— 用介面隔離。換技術不用動核心。</li>
-        <li><strong>DDD</strong>：在 Clean Architecture 上加「業務內聚」— 把規則綁在資料上。資料自我保護。</li>
+        <li><strong>Clean Architecture</strong>：把技術細節（Web、DB、框架）跟業務切開。技術可換，業務不動。介面要定義在「需要它的那一層」，這樣依賴方向才真的反過來。</li>
+        <li><strong>DDD</strong>：規則塞進資料自己（Account、Aggregate），讓資料保護自己。也教你把大系統切成一塊塊獨立的世界（Bounded Context），同一個詞在不同世界可以有不同意思。</li>
       </ol>
 
       <h3>你會記得的關鍵畫面</h3>
@@ -1344,9 +1773,29 @@ public void Test()
         <li>找一個你熟的業務場景（學校選課、購物車、訂閱訂單），用三種架構各寫一次。</li>
         <li>每寫完一次就試圖「<em>讓另一個工程師繞過規則</em>」，看你的設計擋不擋得住。</li>
         <li>寫單元測試。注意 N-Tier 跟 DDD 的測試行數差距。</li>
-        <li>寫完之後，再回去看其他 DDD 教學（Aggregate、Bounded Context、Domain Event），會突然全部看得懂。</li>
+        <li>寫完之後，再回去看其他 DDD 教學，那些一開始看不懂的詞會突然全部看得懂。</li>
       </ol>
+
+      <h3>何時不要用 DDD / Clean Architecture？</h3>
+      <p>DDD 跟 Clean Architecture 不是越多越好。<strong>下面這些情況用了反而拖累進度</strong>，N-Tier 才是對的選擇。</p>
+      <table>
+        <thead><tr><th>情境</th><th>建議</th></tr></thead>
+        <tbody>
+          <tr><td>純 CRUD 後台（功能就是「列表 / 新增 / 修改 / 刪除」）</td><td>N-Tier 就夠，DDD 是殺雞用牛刀</td></tr>
+          <tr><td>原型、demo、玩具專案</td><td>用最快寫得出來的方法，CA/DDD 啟動成本太高</td></tr>
+          <tr><td>專案壽命 &lt; 1 年</td><td>N-Tier，不必投資長期維護成本</td></tr>
+          <tr><td>團隊還不熟悉用「物件」思考程式</td><td>先補基礎，硬上 DDD 會變「假 DDD」</td></tr>
+          <tr><td>業務規則很簡單、很少變動</td><td>N-Tier 加 interface 即可</td></tr>
+          <tr><td>沒有業務專家可以對話</td><td>通用語言做不出來，DDD 會變「工程師自己想像」</td></tr>
+        </tbody>
+      </table>
+      <div class="callout good">
+        <span class="callout-title">✅ 最後一句話</span>
+        <p>架構是工具，不是信仰。<strong>選能解決你問題的最簡單那把</strong>。<br>
+        N-Tier 寫得乾淨的系統，比 DDD 寫得糟的系統好上一百倍。</p>
+      </div>
     </section>
+
 
   </main>
 </div>

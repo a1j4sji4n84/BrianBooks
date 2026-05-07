@@ -1,15 +1,26 @@
+---
+layout: default
+title: 我的書籍目錄
+---
+
 <!DOCTYPE html>
-<html lang="zh-Hant">
+<html>
 <head>
     <meta charset="UTF-8">
-    <meta http-equiv="refresh" content="0; url=./architecture-learning.html">
-    <title>正在重新導向...</title>
-    <script type="text/javascript">
-        // 使用 JavaScript 作為備援導向
-        window.location.href = "./architecture-learning.html";
-    </script>
+    <title>{{ page.title }}</title>
 </head>
 <body>
-    <p>如果頁面沒有自動跳轉，請點擊 <a href="./architecture-learning.html">這裡</a>。</p>
+    <h1>{{ page.title }}</h1>
+    <ul>
+      {% for file in site.static_files %}
+        {% if file.extname == ".pdf" or file.extname == ".md" or file.extname == ".html" %}
+          {% if file.path != "/index.html" %}
+            <li>
+              <a href="{{ site.baseurl }}{{ file.path }}">{{ file.name }}</a>
+            </li>
+          {% endif %}
+        {% endif %}
+      {% endfor %}
+    </ul>
 </body>
 </html>

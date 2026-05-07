@@ -1,0 +1,2 @@
+include: [".nojekyll"] # 如果你有特殊檔案需要包含
+exclude: ["README.md"] # 如果你不想讓某些檔案出現在清單中
